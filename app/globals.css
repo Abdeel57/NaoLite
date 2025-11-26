@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #020617;
+
+  /* Primary - Deep Indigo */
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+
+  /* Secondary - Vibrant Purple */
+  --secondary: #9333ea;
+  --secondary-foreground: #ffffff;
+
+  /* Accent - Sky */
+  --accent: #0ea5e9;
+  --accent-foreground: #ffffff;
+
+  /* Neutral */
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+
+  --card: #ffffff;
+  --card-foreground: #020617;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #4f46e5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #020617;
+    --foreground: #f8fafc;
+
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
+
+    --secondary: #a855f7;
+    --secondary-foreground: #ffffff;
+
+    --accent: #38bdf8;
+    --accent-foreground: #ffffff;
+
+    --muted: #0f172a;
+    --muted-foreground: #94a3b8;
+
+    --card: #0f172a;
+    --card-foreground: #f8fafc;
+
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #6366f1;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-lg;
+  }
+
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-xl border border-white/5 shadow-lg;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
