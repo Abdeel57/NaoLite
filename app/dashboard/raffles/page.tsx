@@ -1,120 +1,145 @@
 "use client"
 
-import Link from "next/link"
 import { Button } from "../../components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "../../components/ui/card"
 import { Badge } from "../../components/ui/badge"
-import { FadeIn, SlideUp, StaggerContainer, ScaleIn } from "../../components/ui/motion"
-import { Raffle } from "../../types"
+import {
+    Plus,
+    MoreVertical,
+    Ticket,
+    Calendar,
+    Users,
+    PlayCircle,
+    PauseCircle,
+    Edit
+} from "lucide-react"
 
-// Mock Data
-const mockRaffles: Raffle[] = [
+const raffles = [
     {
         id: "1",
         title: "Gran Sorteo de Fin de Año",
-        description: "Gana un iPhone 15 Pro Max y muchos premios más.",
         price: 50,
-        totalTickets: 100,
-        soldTickets: 45,
+        sold: 45,
+        total: 100,
         status: "active",
-        endDate: "2024-12-31",
-        organizerId: "user1"
+        endDate: "31 Dic 2024",
+        revenue: 2250
     },
     {
         id: "2",
         title: "Rifa Solidaria",
-        description: "Apoya a nuestra causa y gana una cena para dos.",
         price: 20,
-        totalTickets: 200,
-        soldTickets: 200,
-        status: "sold_out",
-        endDate: "2024-11-30",
-        organizerId: "user1"
+        sold: 200,
+        total: 200,
+        status: "completed",
+        endDate: "30 Nov 2024",
+        revenue: 4000
     },
     {
         id: "3",
-        title: "Sorteo Express",
-        description: "Rifa rápida de fin de semana.",
-        price: 10,
-        totalTickets: 50,
-        soldTickets: 0,
+        title: "Borrador: Rifa de Reyes",
+        price: 100,
+        sold: 0,
+        total: 500,
         status: "draft",
-        endDate: "2024-12-05",
-        organizerId: "user1"
+        endDate: "-",
+        revenue: 0
     }
 ]
 
 export default function RafflesPage() {
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <SlideUp>
-                    <h2 className="text-3xl font-bold tracking-tight">Mis Rifas</h2>
-                    <p className="text-muted-foreground">
-                        Gestiona tus sorteos activos y pasados.
-                    </p>
-                </SlideUp>
-                <SlideUp delay={0.1}>
-                    <Link href="/dashboard/raffles/create">
-                        <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-                            + Nueva Rifa
-                        </Button>
-                    </Link>
-                </SlideUp>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Mis Rifas</h1>
+                    <p className="text-gray-500 mt-1">Crea y administra tus sorteos activos.</p>
+                </div>
+                <Button className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+                    <Plus className="w-5 h-5" />
+                    Crear Nueva Rifa
+                </Button>
             </div>
 
-            <StaggerContainer className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {mockRaffles.map((raffle) => (
-                    <ScaleIn key={raffle.id}>
-                        <Card className="flex flex-col overflow-hidden transition-all hover:shadow-xl hover:border-primary/50 group glass h-full">
-                            <CardHeader className="pb-4">
-                                <div className="flex justify-between items-start">
-                                    <Badge variant={
-                                        raffle.status === 'active' ? 'success' :
-                                            raffle.status === 'sold_out' ? 'secondary' :
-                                                'outline'
-                                    }>
-                                        {raffle.status === 'active' ? 'Activa' :
-                                            raffle.status === 'sold_out' ? 'Agotada' :
-                                                'Borrador'}
-                                    </Badge>
-                                    <span className="text-sm font-medium text-muted-foreground">
-                                        ${raffle.price} / boleto
-                                    </span>
-                                </div>
-                                <CardTitle className="line-clamp-1 mt-2 group-hover:text-primary transition-colors">
-                                    {raffle.title}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="flex-1 pb-4">
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                    {raffle.description}
-                                </p>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {raffles.map((raffle) => (
+                    <Card key={raffle.id} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
+                        <CardHeader className="pb-4">
+                            <div className="flex justify-between items-start">
+                                <Badge
+                                    className={`
+                    ${raffle.status === 'active' ? 'bg-green-100 text-green-700 hover:bg-green-200' : ''}
+                    ${raffle.status === 'completed' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : ''}
+                    ${raffle.status === 'draft' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : ''}
+                    border-none px-3 py-1
+                  `}
+                                >
+                                    {raffle.status === 'active' && '🟢 Activa'}
+                                    {raffle.status === 'completed' && '🏁 Finalizada'}
+                                    {raffle.status === 'draft' && '📝 Borrador'}
+                                </Badge>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="w-4 h-4 text-gray-400" />
+                                </Button>
+                            </div>
+                            <CardTitle className="mt-4 text-xl line-clamp-1 group-hover:text-primary transition-colors">
+                                {raffle.title}
+                            </CardTitle>
+                            <CardDescription className="flex items-center gap-2 mt-2">
+                                <Calendar className="w-4 h-4" />
+                                Finaliza: {raffle.endDate}
+                            </CardDescription>
+                        </CardHeader>
 
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                        <span>Progreso</span>
-                                        <span>{raffle.soldTickets} / {raffle.totalTickets} vendidos</span>
+                        <CardContent className="pb-4">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <p className="text-sm text-gray-500 mb-1">Progreso de Venta</p>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-2xl font-bold text-gray-900">{raffle.sold}</span>
+                                            <span className="text-sm text-gray-500">/ {raffle.total} boletos</span>
+                                        </div>
                                     </div>
-                                    <div className="h-2 w-full bg-secondary/20 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
-                                            style={{ width: `${(raffle.soldTickets / raffle.totalTickets) * 100}%` }}
-                                        />
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-500 mb-1">Recaudado</p>
+                                        <span className="text-lg font-bold text-green-600">${raffle.revenue}</span>
                                     </div>
                                 </div>
-                            </CardContent>
-                            <CardFooter className="bg-muted/30 p-4 pt-4 mt-auto">
-                                <Link href={`/dashboard/raffles/${raffle.id}`} className="w-full">
-                                    <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-white transition-colors border-primary/20">
-                                        Gestionar
-                                    </Button>
-                                </Link>
-                            </CardFooter>
-                        </Card>
-                    </ScaleIn>
+
+                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-500 rounded-full"
+                                        style={{ width: `${(raffle.sold / raffle.total) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+
+                        <CardFooter className="pt-4 border-t bg-gray-50/50 flex gap-2">
+                            <Button variant="outline" className="flex-1 gap-2 hover:border-primary hover:text-primary">
+                                <Edit className="w-4 h-4" />
+                                Editar
+                            </Button>
+                            <Button variant="outline" className="flex-1 gap-2 hover:border-primary hover:text-primary">
+                                <Users className="w-4 h-4" />
+                                Boletos
+                            </Button>
+                        </CardFooter>
+                    </Card>
                 ))}
-            </StaggerContainer>
+
+                {/* Create New Card Placeholder */}
+                <button className="flex flex-col items-center justify-center gap-4 p-8 border-2 border-dashed border-gray-200 rounded-xl hover:border-primary hover:bg-primary/5 transition-all group h-full min-h-[300px]">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                        <Plus className="w-8 h-8 text-gray-400 group-hover:text-white" />
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary">Crear Nueva Rifa</h3>
+                        <p className="text-sm text-gray-500 mt-1">Configura un nuevo sorteo</p>
+                    </div>
+                </button>
+            </div>
         </div>
     )
 }

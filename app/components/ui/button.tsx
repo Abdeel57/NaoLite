@@ -3,15 +3,19 @@
 import * as React from "react"
 import { motion, HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
 
 export interface ButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "default" | "outline" | "ghost" | "secondary" | "destructive"
+    variant?: "default" | "outline" | "ghost" | "secondary" | "destructive" | "link"
     size?: "default" | "sm" | "lg" | "icon"
+    href?: string
 }
 
+const MotionLink = motion(Link)
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ className, variant = "default", size = "default", ...props }, ref) => {
+    ({ className, variant = "default", size = "default", href, ...props }, ref) => {
         const baseStyles = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
 
         const variants = {
@@ -20,6 +24,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
             secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-lg shadow-secondary/20",
             ghost: "hover:bg-accent hover:text-accent-foreground",
+            link: "text-primary underline-offset-4 hover:underline",
         }
 
         const sizes = {
@@ -32,13 +37,25 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         const variantStyles = variants[variant]
         const sizeStyles = sizes[size]
 
+        if (href) {
+            return (
+                <Link
+                    href={href}
+                    className={cn(baseStyles, variantStyles, sizeStyles, className)}
+                    {...props as any}
+                >
+                    {props.children}
+                </Link>
+            )
+        }
+
         return (
             <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={cn(baseStyles, variantStyles, sizeStyles, className)}
                 ref={ref}
-                {...props as any} // Cast to any to avoid complex type issues with motion + forwardRef
+                {...props as any}
             />
         )
     }
