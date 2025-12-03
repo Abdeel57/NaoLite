@@ -19,43 +19,42 @@ export default function LoginPage() {
     const [error, setError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
         setError("")
 
-        // Simulate network delay
-        setTimeout(() => {
-            // Check if user exists in localStorage (simulated auth)
-            const storedUser = localStorage.getItem('signupData')
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: formData.email,
+                    password: formData.password
+                })
+            })
 
-            if (storedUser) {
-                const user = JSON.parse(storedUser)
-                // In a real app, we would check password hash
-                // For this demo, we just check if email matches or if it's the demo user
-                if (user.email === formData.email || formData.email === 'demo@naolite.com') {
-                    // Update session timestamp or token
-                    localStorage.setItem('lastLogin', new Date().toISOString())
-                    router.push("/dashboard")
-                    return
-                }
-            }
+            const data = await response.json()
 
-            // If we get here, either no user found or email mismatch
-            // For better UX in this prototype, we'll allow any login if they have signed up before,
-            // or if they use the demo credentials.
-            // If they haven't signed up, we'll suggest it.
-
-            if (!storedUser) {
-                setError("No encontramos una cuenta. ¡Regístrate para comenzar!")
+            if (!response.ok) {
+                setError(data.error || 'Credenciales incorrectas')
                 setIsLoading(false)
-            } else {
-                // Allow login anyway for the prototype flow if they have data
-                // But strictly speaking we should validate. 
-                // Let's just allow it for now to reduce friction in the demo.
-                router.push("/dashboard")
+                return
             }
-        }, 1000)
+
+            localStorage.setItem('currentUser', JSON.stringify(data.user))
+            localStorage.setItem('lastLogin', new Date().toISOString())
+
+            if (data.user.role === 'ADMIN') {
+                router.push('/admin')
+            } else {
+                router.push(`/${data.user.username}`)
+            }
+        } catch (error) {
+            console.error('Login error:', error)
+            setError('Error al iniciar sesión. Intenta de nuevo.')
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -78,7 +77,7 @@ export default function LoginPage() {
                     {/* Logo and Brand */}
                     <div className="flex items-center justify-center gap-3 mb-2">
                         <div className="relative w-14 h-14 flex-shrink-0">
-                            <Image src="/logo-2.png" alt="NaoLite" fill className="object-contain" />
+                            <Image src="/naolite-logo-blue.png" alt="NaoLite" fill className="object-contain" />
                         </div>
                         <span className="text-3xl font-bold text-primary tracking-tight">NaoLite</span>
                     </div>
@@ -97,14 +96,14 @@ export default function LoginPage() {
                         {/* Email Field */}
                         <div className="space-y-2">
                             <Label htmlFor="email" className="text-sm font-semibold text-gray-700">
-                                Correo Electrónico
+                                Correo Electrónico o Usuario
                             </Label>
                             <div className="relative">
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 <Input
                                     id="email"
-                                    type="email"
-                                    placeholder="tu@email.com"
+                                    type="text"
+                                    placeholder="tu@email.com o usuario"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="pl-11 h-12 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary"

@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  username  String   @unique
+  password  String   // Hashed password
+  phone     String?
+  bio       String?
+  avatarUrl String?
+  facebook  String?
+  instagram String?
+  twitter   String?
+  whatsapp  String?
+  role      Role     @default(USER)
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  raffles   Raffle[]
+}
+
+model Raffle {
+  id           String       @id @default(uuid())
+  title        String
+  description  String
+  price        Float
+  totalTickets Int
+  soldTickets  Int          @default(0)
+  status       RaffleStatus @default(DRAFT)
+  startDate    DateTime     @default(now())
+  endDate      DateTime
+  imageUrl     String?
+  
+  organizerId  String
+  organizer    User         @relation(fields: [organizerId], references: [id])
+  
+  tickets      Ticket[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Ticket {
+  id             String       @id @default(uuid())
+  number         Int
+  status         TicketStatus @default(AVAILABLE)
+  purchaserName  String?
+  purchaserPhone String?
+  purchaserEmail String?
+  reservedAt     DateTime?
+  soldAt         DateTime?
+  
+  raffleId       String
+  raffle         Raffle       @relation(fields: [raffleId], references: [id])
+
+  @@unique([raffleId, number]) // Ensure ticket numbers are unique per raffle
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PRO
+  PREMIUM
+}
+
+enum RaffleStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+  SOLD_OUT
+}
+
+enum TicketStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+}

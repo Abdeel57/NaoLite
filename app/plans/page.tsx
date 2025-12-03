@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
 import { Check, ArrowLeft, Zap, Crown, Rocket, Sparkles } from "lucide-react"
+import { useAuth } from "../components/auth/auth-context"
 
 const plans = [
     {
@@ -67,15 +68,7 @@ const plans = [
 export default function PlansPage() {
     const [selectedPlan, setSelectedPlan] = useState<string | null>("pro")
     const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly")
-    const [isLoggedIn, setIsLoggedIn] = useState(false)
-
-    // Check auth status on mount
-    useState(() => {
-        if (typeof window !== 'undefined') {
-            const userData = localStorage.getItem('signupData')
-            setIsLoggedIn(!!userData)
-        }
-    })
+    const { selectPlan, currentUser } = useAuth()
 
     const handleSelectPlan = (planId: string) => {
         setSelectedPlan(planId)
@@ -84,16 +77,20 @@ export default function PlansPage() {
         const plan = plans.find(p => p.id === planId)
         if (!plan) return
 
-        // Get user data from localStorage (saved during signup)
-        const userData = localStorage.getItem('signupData')
-        const raffleName = userData ? JSON.parse(userData).raffleName : 'Mi Rifa'
-        const userName = userData ? JSON.parse(userData).name : 'Usuario'
+        // Save plan and redirect to profile (this triggers the redirect)
+        selectPlan(planId)
 
-        // Get plan emoji
-        const planEmoji = plan.id === 'basic' ? '⚡' : plan.id === 'pro' ? '👑' : '🚀'
+        // After a short delay, open WhatsApp in a new tab
+        setTimeout(() => {
+            if (currentUser) {
+                const userName = currentUser.name
+                const raffleName = currentUser.username
 
-        // Create structured WhatsApp message
-        const message = `🎉 *¡Hola! Nuevo Cliente Interesado* 🎉
+                // Get plan emoji
+                const planEmoji = plan.id === 'basic' ? '⚡' : plan.id === 'pro' ? '👑' : '🚀'
+
+                // Create structured WhatsApp message
+                const message = `🎉 *¡Hola! Nuevo Cliente Interesado* 🎉
 
 👤 *Nombre:* ${userName}
 🎫 *Nombre de Rifa:* ${raffleName}
@@ -108,14 +105,16 @@ ${plan.features.map((f, i) => `${i + 1}. ✅ ${f}`).join('\n')}
 
 ¿Me pueden ayudar con el proceso de activación? 🙌`
 
-        // Encode message for URL
-        const encodedMessage = encodeURIComponent(message)
+                // Encode message for URL
+                const encodedMessage = encodeURIComponent(message)
 
-        // WhatsApp number
-        const phoneNumber = '5216625260350' // +52 662-526-0350
+                // WhatsApp number
+                const phoneNumber = '5216625260350' // +52 662-526-0350
 
-        // Open WhatsApp
-        window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank')
+                // Open WhatsApp in new tab
+                window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank')
+            }
+        }, 500) // Small delay to ensure redirect happens first
     }
 
     return (
@@ -126,7 +125,7 @@ ${plan.features.map((f, i) => `${i + 1}. ✅ ${f}`).join('\n')}
                     <div className="flex items-center justify-between">
                         <Link href="/" className="flex items-center gap-3">
                             <div className="relative w-10 h-10">
-                                <Image src="/logo-2.png" alt="NaoLite" fill className="object-contain" />
+                                <Image src="/naolite-logo-blue.png" alt="NaoLite" fill className="object-contain" />
                             </div>
                             <span className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                                 NaoLite
@@ -300,23 +299,6 @@ ${plan.features.map((f, i) => `${i + 1}. ✅ ${f}`).join('\n')}
                     </p>
                 </div>
             </div>
-
-            {/* Continue without plan option - Only for logged in users */}
-            {isLoggedIn && (
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 text-center">
-                    <div className="inline-flex flex-col items-center gap-4 p-6 rounded-2xl bg-gray-50 border border-gray-100 max-w-2xl mx-auto">
-                        <p className="text-sm text-gray-600">
-                            ¿Solo quieres configurar tu perfil?
-                            <span className="block text-xs text-gray-500 mt-1">
-                                Podrás personalizar tu perfil pero no podrás crear ni administrar rifas sin un plan activo.
-                            </span>
-                        </p>
-                        <Button href="/dashboard" variant="link" className="text-gray-500 hover:text-gray-900 text-sm font-medium h-auto p-0">
-                            Continuar sin plan <ArrowLeft className="w-4 h-4 ml-1 rotate-180" />
-                        </Button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

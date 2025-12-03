@@ -1,17 +1,44 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
 import { ArrowLeft, User, Mail, Lock, Ticket } from "lucide-react"
+import { useAuth } from "../components/auth/auth-context"
 
-export default function SignupPage() {
+// Plan details for WhatsApp message
+const PLANS_INFO: Record<string, { name: string; price: number; emoji: string; features: string[] }> = {
+    basic: {
+        name: "Básico",
+        price: 250,
+        emoji: "⚡",
+        features: ["1 rifa activa", "100 boletos", "Perfil público"]
+    },
+    pro: {
+        name: "Pro",
+        price: 399,
+        emoji: "👑",
+        features: ["3 sorteos activos", "1,000 boletos", "Logo profesional"]
+    },
+    premium: {
+        name: "Premium",
+        price: 799,
+        emoji: "🚀",
+        features: ["Sorteos ilimitados", "Boletos ilimitados", "Soporte 24/7"]
+    }
+}
+
+function SignupForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const { signup, selectPlan } = useAuth()
+    const selectedPlanId = searchParams.get("plan")
+
     const [formData, setFormData] = useState({
         name: "",
         raffleName: "",
@@ -35,11 +62,52 @@ export default function SignupPage() {
 
         setErrors({ passwordMatch: "" })
 
-        // Save user data to localStorage (simulating auth)
-        localStorage.setItem('signupData', JSON.stringify(formData))
+        // Create username from raffle name (lowercase, no spaces)
+        const username = formData.raffleName.toLowerCase().replace(/\s+/g, '-')
 
-        // Redirect to plans page
-        router.push("/plans")
+        // Save user data using auth context
+        signup({
+            username,
+            name: formData.name,
+            email: formData.email
+        })
+
+        // If a plan was pre-selected from landing page
+        if (selectedPlanId && PLANS_INFO[selectedPlanId]) {
+            // Save plan
+            selectPlan(selectedPlanId)
+
+            // Trigger WhatsApp redirect logic
+            const plan = PLANS_INFO[selectedPlanId]
+
+            setTimeout(() => {
+                const message = `🎉 *¡Hola! Nuevo Cliente Interesado* 🎉
+
+👤 *Nombre:* ${formData.name}
+🎫 *Nombre de Rifa:* ${username}
+
+${plan.emoji} *Plan Seleccionado:* ${plan.name}
+💰 *Precio:* $${plan.price} MXN/mes
+
+📋 *Características incluidas:*
+${plan.features.map((f, i) => `${i + 1}. ✅ ${f}`).join('\n')}
+
+✨ Estoy listo para iniciar mi rifa en *NaoLite* y me gustaría recibir más información sobre cómo empezar.
+
+¿Me pueden ayudar con el proceso de activación? 🙌`
+
+                const encodedMessage = encodeURIComponent(message)
+                const phoneNumber = '5216625260350'
+
+                window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank')
+            }, 500)
+
+            // Redirect directly to profile
+            router.push(`/${username}`)
+        } else {
+            // No plan selected, go to plans page
+            router.push("/plans")
+        }
     }
 
     return (
@@ -62,7 +130,7 @@ export default function SignupPage() {
                     {/* Logo and Brand */}
                     <div className="flex items-center justify-center gap-3 mb-2">
                         <div className="relative w-14 h-14 flex-shrink-0">
-                            <Image src="/logo-2.png" alt="NaoLite" fill className="object-contain" />
+                            <Image src="/naolite-logo-blue.png" alt="NaoLite" fill className="object-contain" />
                         </div>
                         <span className="text-3xl font-bold text-primary tracking-tight">NaoLite</span>
                     </div>
@@ -71,7 +139,11 @@ export default function SignupPage() {
                     <div className="space-y-2">
                         <CardTitle className="text-2xl font-bold text-gray-900">Crear Cuenta</CardTitle>
                         <CardDescription className="text-sm text-gray-600 max-w-sm mx-auto">
-                            Crea tu perfil de NaoLite y comienza a organizar rifas
+                            {selectedPlanId ? (
+                                <span>Estás a un paso de activar tu plan <span className="font-bold text-primary">{PLANS_INFO[selectedPlanId]?.name || ''}</span></span>
+                            ) : (
+                                "Crea tu perfil de NaoLite y comienza a organizar rifas"
+                            )}
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -189,7 +261,7 @@ export default function SignupPage() {
                             type="submit"
                             className="w-full h-12 text-base font-bold bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 shadow-lg hover:shadow-xl transition-all duration-200 mt-6"
                         >
-                            Crear mi Perfil
+                            {selectedPlanId ? "Continuar a WhatsApp" : "Crear mi Perfil"}
                         </Button>
 
                         {/* Login Link */}
@@ -203,5 +275,13 @@ export default function SignupPage() {
                 </CardContent>
             </Card>
         </div>
+    )
+}
+
+export default function SignupPage() {
+    return (
+        <Suspense fallback={<div>Cargando...</div>}>
+            <SignupForm />
+        </Suspense>
     )
 }

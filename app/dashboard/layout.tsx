@@ -8,7 +8,6 @@ import {
     Palette,
     Calendar,
     TrendingUp,
-    Ticket,
     User,
     LogOut,
     Menu,
@@ -37,11 +36,6 @@ const sidebarItems = [
         title: "Ventas",
         href: "/dashboard/sales",
         icon: TrendingUp,
-    },
-    {
-        title: "Rifas",
-        href: "/dashboard/raffles",
-        icon: Ticket,
     },
     {
         title: "Usuario",

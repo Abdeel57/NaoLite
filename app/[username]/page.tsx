@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, use, useEffect } from "react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, useSearchParams } from "next/navigation"
 import { Button } from "../components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
@@ -11,14 +11,17 @@ import { CreateRaffleCTA } from "../components/ui/create-raffle-cta"
 import { Award, Ticket, TrendingUp, Facebook, Instagram, Twitter, MessageCircle, ChevronDown, Settings } from "lucide-react"
 import { CountdownTimer } from "../components/ui/countdown-timer"
 import { AdminSlidePanel } from "../components/ui/admin-slide-panel"
+import { WelcomeTutorial } from "../components/tutorial/welcome-tutorial"
+import { useAuth } from "../components/auth/auth-context"
 
 // Mock Data Fetcher
 function getOrganizer(username: string) {
-    if (username === "demo") {
+    // Check if it's a demo user
+    if (username === "demo" || username === "demo-user") {
         return {
             id: "user1",
             name: "Club Deportivo Demo",
-            username: "demo",
+            username: "demo-user",
             bio: "Organizamos rifas para apoyar el deporte local. ¡Participa y gana grandes premios!",
             avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=CD",
             stats: {
@@ -48,6 +51,36 @@ function getOrganizer(username: string) {
             ]
         }
     }
+
+    // For real users, get data from localStorage
+    if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem("currentUser")
+        if (storedUser) {
+            const user = JSON.parse(storedUser)
+            if (user.username === username) {
+                return {
+                    id: user.username,
+                    name: user.name,
+                    username: user.username,
+                    bio: "¡Bienvenido a mi perfil de rifas! Aquí podrás participar en sorteos increíbles.",
+                    avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`,
+                    stats: {
+                        totalRaffles: 0,
+                        activeRaffles: 0,
+                        totalParticipants: 0
+                    },
+                    socialLinks: {
+                        facebook: "",
+                        instagram: "",
+                        twitter: "",
+                        whatsapp: ""
+                    },
+                    faqs: []
+                }
+            }
+        }
+    }
+
     return null
 }
 
@@ -81,6 +114,13 @@ function getOrganizerRaffles(organizerId: string): Raffle[] {
 export default function OrganizerProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
     const { username } = use(params)
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        if (searchParams.get('admin') === 'true') {
+            setIsAdminPanelOpen(true)
+        }
+    }, [searchParams])
     const organizer = getOrganizer(username)
 
     if (!organizer) {
@@ -91,7 +131,32 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
     const activeRaffles = raffles.filter(r => r.status === 'active')
 
     // Mock ownership check - in production use real auth
-    const isOwner = username === "demo"
+    // Auth and tutorial state
+    const { currentUser, markTutorialComplete } = useAuth()
+    const isOwner = currentUser?.username === username
+    const [showWelcomeTutorial, setShowWelcomeTutorial] = useState(false)
+
+    // Check if should show welcome tutorial
+    useEffect(() => {
+        if (currentUser && currentUser.isFirstTimeUser && isOwner) {
+            // Small delay to ensure DOM is ready
+            const timer = setTimeout(() => {
+                setShowWelcomeTutorial(true)
+            }, 500)
+            return () => clearTimeout(timer)
+        }
+    }, [currentUser, isOwner])
+
+    const handleWelcomeTutorialComplete = () => {
+        setShowWelcomeTutorial(false)
+
+        // Remove the admin tutorial flag to ensure it starts
+        localStorage.removeItem("hasSeenAdminTutorial")
+
+        // Open admin panel and mark user tutorial as complete
+        setIsAdminPanelOpen(true)
+        markTutorialComplete()
+    }
 
     return (
         <div className="min-h-screen bg-white">
@@ -300,6 +365,7 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
             {/* Floating Admin Button - Only visible to owner */}
             {isOwner && (
                 <button
+                    id="admin-floating-button"
                     onClick={() => setIsAdminPanelOpen(true)}
                     className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-2xl hover:shadow-primary/50 hover:scale-110 transition-all duration-300 flex items-center justify-center z-30 group"
                     aria-label="Abrir panel de administración"
@@ -312,6 +378,13 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
             <AdminSlidePanel
                 isOpen={isAdminPanelOpen}
                 onClose={() => setIsAdminPanelOpen(false)}
+            />
+
+            {/* Welcome Tutorial */}
+            <WelcomeTutorial
+                isActive={showWelcomeTutorial}
+                onComplete={handleWelcomeTutorialComplete}
+                adminButtonId="admin-floating-button"
             />
         </div>
     )
