@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../compone
 import { Badge } from "../components/ui/badge"
 import { Raffle } from "../types"
 import { CreateRaffleCTA } from "../components/ui/create-raffle-cta"
-import { Award, Ticket, TrendingUp, Facebook, Instagram, Twitter, MessageCircle, ChevronDown, Settings } from "lucide-react"
+import { Award, Ticket, TrendingUp, Facebook, Instagram, Twitter, MessageCircle, ChevronDown, Settings, ShieldCheck } from "lucide-react"
 import { CountdownTimer } from "../components/ui/countdown-timer"
 import { AdminSlidePanel } from "../components/ui/admin-slide-panel"
 import { WelcomeTutorial } from "../components/tutorial/welcome-tutorial"
@@ -113,29 +113,27 @@ function getOrganizerRaffles(organizerId: string): Raffle[] {
 
 export default function OrganizerProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
+    const [organizer, setOrganizer] = useState<any>(null)
+    const [raffles, setRaffles] = useState<Raffle[]>([])
+    const [loading, setLoading] = useState(true)
     const { username } = use(params)
     const searchParams = useSearchParams()
+    
+    // Auth and tutorial state - MUST be before any conditional returns
+    const { currentUser, markTutorialComplete } = useAuth()
+    const [showWelcomeTutorial, setShowWelcomeTutorial] = useState(false)
+    const isOwner = currentUser?.username === username
 
     useEffect(() => {
         if (searchParams.get('admin') === 'true') {
             setIsAdminPanelOpen(true)
         }
     }, [searchParams])
-    const organizer = getOrganizer(username)
 
-    if (!organizer) {
-        notFound()
-    }
-
-    const raffles = getOrganizerRaffles(organizer.id)
-    const activeRaffles = raffles.filter(r => r.status === 'active')
-
-    // Mock ownership check - in production use real auth
-    // Auth and tutorial state
-    const { currentUser, markTutorialComplete } = useAuth()
-    const isOwner = currentUser?.username === username
-    const [showWelcomeTutorial, setShowWelcomeTutorial] = useState(false)
-
+    useEffect(() => {
+        loadOrganizerData()
+    }, [username])
+    
     // Check if should show welcome tutorial
     useEffect(() => {
         if (currentUser && currentUser.isFirstTimeUser && isOwner) {
@@ -146,6 +144,97 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
             return () => clearTimeout(timer)
         }
     }, [currentUser, isOwner])
+
+    const loadOrganizerData = async () => {
+        try {
+            // Cargar perfil del organizador
+            const profileResponse = await fetch(`/api/user/profile?username=${username}`)
+            if (!profileResponse.ok) {
+                // Si no existe, usar datos demo o mostrar error
+                const demoOrganizer = getOrganizer(username)
+                if (demoOrganizer) {
+                    setOrganizer(demoOrganizer)
+                    const demoRaffles = getOrganizerRaffles(demoOrganizer.id)
+                    setRaffles(demoRaffles)
+                }
+                setLoading(false)
+                return
+            }
+
+            const profileData = await profileResponse.json()
+            
+            // Cargar rifas del organizador
+            const rafflesResponse = await fetch(`/api/user/raffles?username=${username}`)
+            let rafflesData = []
+            if (rafflesResponse.ok) {
+                rafflesData = await rafflesResponse.json()
+            }
+
+            // Calcular estadísticas
+            const activeRafflesCount = rafflesData.filter((r: any) => r.status === 'ACTIVE').length
+            const totalParticipants = rafflesData.reduce((sum: number, r: any) => sum + r.soldTickets, 0)
+
+            setOrganizer({
+                id: profileData.id,
+                name: profileData.name,
+                username: profileData.username,
+                bio: profileData.bio || '¡Bienvenido a mi perfil de rifas! Aquí podrás participar en sorteos increíbles.',
+                avatarUrl: profileData.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${profileData.name}`,
+                stats: {
+                    totalRaffles: rafflesData.length,
+                    activeRaffles: activeRafflesCount,
+                    totalParticipants
+                },
+                socialLinks: {
+                    facebook: profileData.facebook || '',
+                    instagram: profileData.instagram || '',
+                    twitter: profileData.twitter || '',
+                    whatsapp: profileData.whatsapp || profileData.phone || ''
+                },
+                faqs: []
+            })
+
+            // Convertir rifas al formato esperado
+            const formattedRaffles = rafflesData.map((r: any) => ({
+                id: r.id,
+                title: r.title,
+                description: r.description,
+                price: r.price,
+                totalTickets: r.totalTickets,
+                soldTickets: r.soldTickets,
+                status: r.status.toLowerCase(),
+                endDate: r.endDate,
+                organizerId: r.organizerId
+            }))
+
+            setRaffles(formattedRaffles)
+        } catch (error) {
+            console.error('Error loading organizer data:', error)
+            // Fallback a datos demo
+            const demoOrganizer = getOrganizer(username)
+            if (demoOrganizer) {
+                setOrganizer(demoOrganizer)
+                const demoRaffles = getOrganizerRaffles(demoOrganizer.id)
+                setRaffles(demoRaffles)
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        )
+    }
+
+    if (!organizer) {
+        notFound()
+    }
+
+    const activeRaffles = raffles.filter(r => r.status === 'active')
 
     const handleWelcomeTutorialComplete = () => {
         setShowWelcomeTutorial(false)
@@ -332,7 +421,7 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
                 <div className="max-w-3xl mx-auto px-4 py-6 md:py-8 border-t">
                     <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4 text-center">Preguntas Frecuentes</h3>
                     <div className="space-y-2.5">
-                        {organizer.faqs.map((faq, index) => (
+                        {organizer.faqs.map((faq: { question: string; answer: string }, index: number) => (
                             <details
                                 key={index}
                                 className="group border-2 border-gray-100 rounded-xl overflow-hidden hover:border-primary transition-colors"
@@ -386,6 +475,23 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
                 onComplete={handleWelcomeTutorialComplete}
                 adminButtonId="admin-floating-button"
             />
+
+            {/* Trust Banner - Fixed Bottom */}
+            <div 
+                className="fixed bottom-0 left-0 right-0 bg-emerald-50 border-t border-emerald-100 py-2 text-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"
+                style={{ 
+                    position: 'fixed',
+                    zIndex: 9999,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                }}
+            >
+                <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-700">
+                    <ShieldCheck className="w-4 h-4" />
+                    Estos sorteos son seguros
+                </div>
+            </div>
         </div>
     )
 }

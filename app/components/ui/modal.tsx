@@ -37,15 +37,13 @@ export function Modal({ isOpen, onClose, title, description, children, footer }:
                     <CardContent>
                         {children}
                     </CardContent>
-                    {(footer || onClose) && (
-                        <CardFooter className="flex justify-end gap-2">
-                            {footer ? footer : (
-                                <Button variant="outline" onClick={onClose}>
-                                    Cerrar
-                                </Button>
-                            )}
-                        </CardFooter>
-                    )}
+                    <CardFooter className="flex justify-end gap-2">
+                        {footer ? footer : (
+                            <Button variant="outline" onClick={onClose}>
+                                Cerrar
+                            </Button>
+                        )}
+                    </CardFooter>
                 </Card>
             </div>
         </div>,

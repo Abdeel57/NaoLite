@@ -56,11 +56,58 @@ export async function PUT(request: NextRequest) {
         const body = await request.json()
         const { username, name, bio, email, phone, facebook, instagram, twitter, whatsapp, avatarUrl } = body
 
+        // Validaciones
         if (!username) {
             return NextResponse.json(
-                { error: 'Username is required' },
+                { error: 'Username es requerido' },
                 { status: 400 }
             )
+        }
+
+        // Validar formato de email si se proporciona
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return NextResponse.json(
+                { error: 'Formato de email inválido' },
+                { status: 400 }
+            )
+        }
+
+        // Validar longitud de bio si se proporciona
+        if (bio !== undefined && bio !== null && bio.length > 500) {
+            return NextResponse.json(
+                { error: 'La biografía no puede exceder 500 caracteres' },
+                { status: 400 }
+            )
+        }
+
+        // Verificar si el usuario existe
+        const existingUser = await prisma.user.findUnique({
+            where: { username },
+            select: { id: true }
+        })
+
+        if (!existingUser) {
+            return NextResponse.json(
+                { error: 'Usuario no encontrado' },
+                { status: 404 }
+            )
+        }
+
+        // Si se cambia el email, verificar que no esté en uso por otro usuario
+        if (email) {
+            const emailInUse = await prisma.user.findFirst({
+                where: {
+                    email,
+                    NOT: { username }
+                }
+            })
+
+            if (emailInUse) {
+                return NextResponse.json(
+                    { error: 'El email ya está en uso por otro usuario' },
+                    { status: 400 }
+                )
+            }
         }
 
         // Update user profile
@@ -94,11 +141,30 @@ export async function PUT(request: NextRequest) {
             },
         })
 
-        return NextResponse.json(updatedUser)
-    } catch (error) {
+        return NextResponse.json({
+            success: true,
+            user: updatedUser
+        })
+    } catch (error: any) {
         console.error('Error updating user profile:', error)
+        
+        // Manejar errores específicos de Prisma
+        if (error.code === 'P2002') {
+            return NextResponse.json(
+                { error: 'El email ya está en uso' },
+                { status: 400 }
+            )
+        }
+        
+        if (error.code === 'P2025') {
+            return NextResponse.json(
+                { error: 'Usuario no encontrado' },
+                { status: 404 }
+            )
+        }
+
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Error al actualizar el perfil' },
             { status: 500 }
         )
     }

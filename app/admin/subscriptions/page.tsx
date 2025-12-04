@@ -58,10 +58,7 @@ export default function AdminSubscriptionsPage() {
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Suscripciones y Pagos</h1>
                     <p className="text-gray-500 mt-1">Historial de transacciones y estado de suscripciones.</p>
                 </div>
-                <Button variant="outline" className="gap-2">
-                    <Download className="w-4 h-4" />
-                    Exportar Reporte
-                </Button>
+                {/* Export functionality will be implemented later */}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

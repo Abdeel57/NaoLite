@@ -25,6 +25,12 @@ model User {
   whatsapp  String?
   role      Role     @default(USER)
   plan      Plan     @default(FREE)
+  
+  // Subscription Management
+  subscriptionEnd DateTime?
+  lastPaymentDate DateTime?
+  notes           String?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -91,4 +97,24 @@ enum TicketStatus {
   AVAILABLE
   RESERVED
   SOLD
+}
+
+model SiteConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique  // e.g., "site_name", "primary_color", "bank_account"
+  value     String              // JSON string for complex values
+  category  String              // "general", "plans", "payments", "notifications"
+  type      String              // "text", "number", "boolean", "json", "color", "image"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?             // ID of admin who made the change
+}
+
+model ConfigHistory {
+  id        String   @id @default(uuid())
+  configKey String
+  oldValue  String?
+  newValue  String
+  changedBy String              // ID of admin who made the change
+  changedAt DateTime @default(now())
 }

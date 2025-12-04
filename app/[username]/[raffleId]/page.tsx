@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/app/components/ui/card"
 import { Badge } from "@/app/components/ui/badge"
 import { Input } from "@/app/components/ui/input"
 import { Label } from "@/app/components/ui/label"
-import { ArrowLeft, Calendar, Ticket, User, Users, ChevronLeft, ChevronRight, Clock, Sparkles, Search, Copy, Check } from "lucide-react"
+import { ArrowLeft, Calendar, Ticket, User, Users, ChevronLeft, ChevronRight, Clock, Sparkles, Search, Copy, Check, ShieldCheck } from "lucide-react"
 import { CountdownTimer } from "@/app/components/ui/countdown-timer"
 import { CreateRaffleCTA } from "@/app/components/ui/create-raffle-cta"
 
@@ -178,6 +178,9 @@ Adjunto comprobante de transferencia.`
                     <span className="font-bold text-lg text-primary">{RAFFLE_DATA.organizerName}</span>
                 </div>
             </div>
+
+            {/* Trust Banner - Moved to bottom */}
+
 
             {checkoutStep === 'selection' && (
                 <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
@@ -688,6 +691,16 @@ Adjunto comprobante de transferencia.`
 
             {/* CTA Section - Only show in selection step */}
             {checkoutStep === 'selection' && <CreateRaffleCTA />}
+
+            {/* Trust Banner - Fixed Bottom */}
+            {selectedTickets.length === 0 && checkoutStep === 'selection' && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-emerald-50 border-t border-emerald-100 py-2 text-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                    <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-700">
+                        <ShieldCheck className="w-4 h-4" />
+                        Estos sorteos son seguros
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

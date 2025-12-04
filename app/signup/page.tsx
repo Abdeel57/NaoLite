@@ -69,7 +69,8 @@ function SignupForm() {
         signup({
             username,
             name: formData.name,
-            email: formData.email
+            email: formData.email,
+            password: formData.password
         })
 
         // If a plan was pre-selected from landing page
