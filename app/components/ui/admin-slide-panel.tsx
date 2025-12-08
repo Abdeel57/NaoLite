@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Palette, Calendar, TrendingUp, Ticket, User, Save, Upload, Mail, Phone, Facebook, Instagram, Twitter, MessageCircle, Share2, Copy, Check } from "lucide-react"
+import { X, Palette, Calendar, TrendingUp, Ticket, User, Save, Upload, Mail, Phone, Facebook, Instagram, Twitter, MessageCircle, Share2, Copy, Check, Trash2, Image as ImageIcon } from "lucide-react"
 import { Button } from "./button"
 import { Input } from "./input"
 import { Textarea } from "./textarea"
@@ -119,6 +119,7 @@ function CustomizeContent() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+    const [originalImages, setOriginalImages] = useState({ logoData: '', bannerData: '' })
     const [formData, setFormData] = useState({
         name: '',
         bio: '',
@@ -127,41 +128,101 @@ function CustomizeContent() {
         facebook: '',
         instagram: '',
         twitter: '',
-        whatsapp: ''
+        whatsapp: '',
+        primaryColor: '#1dadfb',
+        logoData: '',
+        bannerData: '',
+        paymentCards: [] as Array<{ bank: string; accountNumber: string; accountHolder: string; cardType: string }>,
+        faqs: [] as Array<{ question: string; answer: string }>
     })
 
     // Cargar datos del usuario
     useEffect(() => {
         const loadUserData = async () => {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+
             try {
                 const currentUser = localStorage.getItem('currentUser')
                 if (!currentUser) {
                     setMessage({ type: 'error', text: 'No hay sesión activa' })
-                    setLoading(false)
                     return
                 }
 
                 const user = JSON.parse(currentUser)
-                const response = await fetch(`/api/user/profile?username=${user.username}`)
-                
-                if (response.ok) {
-                    const data = await response.json()
-                    setFormData({
-                        name: data.name || '',
-                        bio: data.bio || '',
-                        email: data.email || '',
-                        phone: data.phone || '',
-                        facebook: data.facebook || '',
-                        instagram: data.instagram || '',
-                        twitter: data.twitter || '',
-                        whatsapp: data.whatsapp || ''
-                    })
-                } else {
+
+                // STEP 1: Load profile (fast, no images)
+                const response = await fetch(`/api/user/profile?username=${user.username}`, {
+                    signal: controller.signal
+                })
+
+                if (!response.ok) {
                     setMessage({ type: 'error', text: 'Error al cargar perfil' })
+                    return
                 }
-            } catch (error) {
-                setMessage({ type: 'error', text: 'Error de conexión' })
+
+                const data = await response.json()
+
+                // STEP 2: Try to get images from localStorage cache
+                const cacheKey = `profile_images_${user.username}`
+                const cachedImages = localStorage.getItem(cacheKey)
+                let logoData = ''
+                let bannerData = ''
+
+                if (cachedImages) {
+                    // Use cached images immediately
+                    const parsed = JSON.parse(cachedImages)
+                    logoData = parsed.logoData || ''
+                    bannerData = parsed.bannerData || ''
+                    console.log('[Admin Panel] Using cached images')
+                } else {
+                    // STEP 3: Fetch images separately if not cached
+                    try {
+                        const imagesResponse = await fetch(`/api/user/profile/images?username=${user.username}`)
+                        if (imagesResponse.ok) {
+                            const imagesData = await imagesResponse.json()
+                            logoData = imagesData.logoData || ''
+                            bannerData = imagesData.bannerData || ''
+                            // Cache for future use
+                            localStorage.setItem(cacheKey, JSON.stringify({ logoData, bannerData }))
+                            console.log('[Admin Panel] Fetched and cached images')
+                        }
+                    } catch (e) {
+                        console.error('Error fetching images:', e)
+                        // Continue without images
+                    }
+                }
+
+                const loadedData = {
+                    name: data.name || '',
+                    bio: data.bio || '',
+                    email: data.email || '',
+                    phone: data.phone || '',
+                    facebook: data.facebook || '',
+                    instagram: data.instagram || '',
+                    twitter: data.twitter || '',
+                    whatsapp: data.whatsapp || '',
+                    primaryColor: data.primaryColor || '#1dadfb',
+                    logoData,
+                    bannerData,
+                    paymentCards: data.paymentCards ? JSON.parse(data.paymentCards) : [],
+                    faqs: data.faqs ? JSON.parse(data.faqs) : []
+                }
+                setFormData(loadedData)
+                // Track original images to detect changes
+                setOriginalImages({
+                    logoData,
+                    bannerData
+                })
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    setMessage({ type: 'error', text: 'La carga está tardando demasiado. Intenta de nuevo.' })
+                } else {
+                    console.error('Error loading profile:', error)
+                    setMessage({ type: 'error', text: 'Error de conexión' })
+                }
             } finally {
+                clearTimeout(timeoutId)
                 setLoading(false)
             }
         }
@@ -174,9 +235,73 @@ function CustomizeContent() {
         setMessage(null)
     }
 
+    const compressImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = (event) => {
+                const img = new Image()
+                img.src = event.target?.result as string
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    let width = img.width
+                    let height = img.height
+
+                    // Max dimensions
+                    const MAX_WIDTH = 1200
+                    const MAX_HEIGHT = 1200
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width
+                            width = MAX_WIDTH
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height
+                            height = MAX_HEIGHT
+                        }
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+                    const ctx = canvas.getContext('2d')
+                    ctx?.drawImage(img, 0, 0, width, height)
+
+                    // Compress to JPEG with 0.85 quality (good balance)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+                    resolve(dataUrl)
+                }
+                img.onerror = (error) => reject(error)
+            }
+            reader.onerror = (error) => reject(error)
+        })
+    }
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'logoData' | 'bannerData') => {
+        const file = e.target.files?.[0]
+        if (file) {
+            try {
+                // Show loading state if needed, or just process
+                const compressedBase64 = await compressImage(file)
+                setFormData(prev => ({ ...prev, [field]: compressedBase64 }))
+            } catch (error) {
+                console.error('Error compressing image:', error)
+                alert('Error al procesar la imagen')
+            }
+        }
+    }
+
+    const removeImage = (field: 'logoData' | 'bannerData') => {
+        setFormData(prev => ({ ...prev, [field]: "" }))
+    }
+
     const handleSave = async () => {
         setSaving(true)
         setMessage(null)
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout for upload
 
         try {
             const currentUser = localStorage.getItem('currentUser')
@@ -187,32 +312,89 @@ function CustomizeContent() {
             }
 
             const user = JSON.parse(currentUser)
+
+            // Build payload - only include images if they changed
+            const payload: any = {
+                username: user.username,
+                name: formData.name,
+                bio: formData.bio,
+                email: formData.email,
+                phone: formData.phone,
+                facebook: formData.facebook,
+                instagram: formData.instagram,
+                twitter: formData.twitter,
+                whatsapp: formData.whatsapp,
+                primaryColor: formData.primaryColor,
+                paymentCards: JSON.stringify(formData.paymentCards),
+                faqs: JSON.stringify(formData.faqs)
+            }
+
+            // Only include images if they changed (this saves MASSIVE bandwidth)
+            if (formData.logoData !== originalImages.logoData) {
+                payload.logoData = formData.logoData
+                console.log('[Admin Panel] Logo changed, including in payload')
+            }
+            if (formData.bannerData !== originalImages.bannerData) {
+                payload.bannerData = formData.bannerData
+                console.log('[Admin Panel] Banner changed, including in payload')
+            }
+
+            console.log(`[Admin Panel] Payload size: ${(JSON.stringify(payload).length / 1024).toFixed(2)} KB`)
+
             const response = await fetch('/api/user/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: user.username,
-                    ...formData
-                })
+                body: JSON.stringify(payload),
+                signal: controller.signal
             })
 
             const data = await response.json()
 
             if (response.ok) {
                 setMessage({ type: 'success', text: 'Perfil actualizado correctamente' })
-                
+
+                // If images changed, invalidate cache
+                if (formData.logoData !== originalImages.logoData || formData.bannerData !== originalImages.bannerData) {
+                    const cacheKey = `profile_images_${user.username}`
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        logoData: formData.logoData,
+                        bannerData: formData.bannerData
+                    }))
+                    console.log('[Admin Panel] Updated image cache')
+                }
+
+                // Update original images to the new values
+                setOriginalImages({
+                    logoData: formData.logoData,
+                    bannerData: formData.bannerData
+                })
+
                 // Actualizar localStorage con los nuevos datos
-                const updatedUser = { ...user, ...data.user }
+                // Nota: La API ya no devuelve las imágenes para ahorrar ancho de banda,
+                // así que las tomamos del formData local.
+                const updatedUser = {
+                    ...user,
+                    ...data.user,
+                    logoData: formData.logoData,
+                    bannerData: formData.bannerData,
+                    primaryColor: formData.primaryColor
+                }
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser))
-                
+
                 // Limpiar mensaje después de 3 segundos
                 setTimeout(() => setMessage(null), 3000)
             } else {
                 setMessage({ type: 'error', text: data.error || 'Error al guardar' })
             }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Error de conexión' })
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                setMessage({ type: 'error', text: 'El guardado tardó demasiado. Intenta con imágenes más ligeras.' })
+            } else {
+                console.error('Error saving profile:', error)
+                setMessage({ type: 'error', text: 'Error de conexión' })
+            }
         } finally {
+            clearTimeout(timeoutId)
             setSaving(false)
         }
     }
@@ -228,11 +410,10 @@ function CustomizeContent() {
     return (
         <div className="p-6 space-y-6">
             {message && (
-                <div className={`p-3 rounded-lg text-sm ${
-                    message.type === 'success' 
-                        ? 'bg-green-50 text-green-800 border border-green-200' 
-                        : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
                     {message.text}
                 </div>
             )}
@@ -240,18 +421,18 @@ function CustomizeContent() {
             <div className="space-y-4">
                 <h3 className="font-semibold text-gray-900">Información Básica</h3>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre de la Organización</label>
-                    <Input 
-                        placeholder="Club Deportivo Demo" 
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre Público (Título del Perfil)</label>
+                    <Input
+                        placeholder="Club Deportivo Demo"
                         value={formData.name}
                         onChange={(e) => handleChange('name', e.target.value)}
                     />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Biografía / Descripción</label>
-                    <Textarea 
-                        placeholder="Describe tu organización..." 
-                        rows={4} 
+                    <Textarea
+                        placeholder="Describe tu organización..."
+                        rows={4}
                         value={formData.bio}
                         onChange={(e) => handleChange('bio', e.target.value)}
                         maxLength={500}
@@ -260,8 +441,8 @@ function CustomizeContent() {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
-                    <Input 
-                        type="email" 
+                    <Input
+                        type="email"
                         placeholder="contacto@ejemplo.com"
                         value={formData.email}
                         onChange={(e) => handleChange('email', e.target.value)}
@@ -269,8 +450,8 @@ function CustomizeContent() {
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono / WhatsApp</label>
-                    <Input 
-                        type="tel" 
+                    <Input
+                        type="tel"
                         placeholder="+52 123 456 7890"
                         value={formData.phone}
                         onChange={(e) => handleChange('phone', e.target.value)}
@@ -279,19 +460,108 @@ function CustomizeContent() {
             </div>
 
             <div className="space-y-4">
+                <h3 className="font-semibold text-gray-900">Marca e Imagen</h3>
+
+                {/* Logo */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-primary/50 transition-colors bg-gray-50 relative group">
+                        {formData.logoData ? (
+                            <>
+                                <img src={formData.logoData} alt="Logo" className="w-20 h-20 object-contain rounded-lg shadow-sm" />
+                                <button
+                                    className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                                    onClick={() => removeImage('logoData')}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="w-8 h-8 text-gray-400" />
+                                <div className="text-center">
+                                    <p className="text-xs text-gray-500">Click para subir logo</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    onChange={(e) => handleImageUpload(e, 'logoData')}
+                                />
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Banner */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Banner</label>
+                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-primary/50 transition-colors bg-gray-50 relative group">
+                        {formData.bannerData ? (
+                            <>
+                                <div className="w-full h-20 rounded-lg overflow-hidden shadow-sm relative">
+                                    <img src={formData.bannerData} alt="Banner" className="w-full h-full object-cover" />
+                                </div>
+                                <button
+                                    className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                                    onClick={() => removeImage('bannerData')}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <ImageIcon className="w-8 h-8 text-gray-400" />
+                                <div className="text-center">
+                                    <p className="text-xs text-gray-500">Click para subir banner</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    onChange={(e) => handleImageUpload(e, 'bannerData')}
+                                />
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Color */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Color Primario</label>
+                    <div className="flex items-center gap-3">
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden shadow-md border border-gray-200">
+                            <input
+                                type="color"
+                                value={formData.primaryColor}
+                                onChange={(e) => handleChange('primaryColor', e.target.value)}
+                                className="absolute -top-2 -left-2 w-14 h-14 cursor-pointer p-0 border-0"
+                            />
+                        </div>
+                        <Input
+                            value={formData.primaryColor}
+                            onChange={(e) => handleChange('primaryColor', e.target.value)}
+                            className="font-mono uppercase flex-1"
+                            maxLength={7}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-4">
                 <h3 className="font-semibold text-gray-900">Redes Sociales</h3>
                 <div className="space-y-3">
-                    <Input 
-                        placeholder="Facebook URL" 
+                    <Input
+                        placeholder="Facebook URL"
                         value={formData.facebook}
                         onChange={(e) => handleChange('facebook', e.target.value)}
                     />
-                    <Input 
+                    <Input
                         placeholder="Instagram URL"
                         value={formData.instagram}
                         onChange={(e) => handleChange('instagram', e.target.value)}
                     />
-                    <Input 
+                    <Input
                         placeholder="Twitter URL"
                         value={formData.twitter}
                         onChange={(e) => handleChange('twitter', e.target.value)}
@@ -299,8 +569,142 @@ function CustomizeContent() {
                 </div>
             </div>
 
-            <Button 
-                className="w-full" 
+            {/* Payment Cards Section */}
+            <div className="space-y-4">
+                <h3 className="font-semibold text-gray-900">Tarjetas de Pago</h3>
+                <p className="text-xs text-gray-500">Agrega las tarjetas donde los clientes pueden depositar el pago de sus boletos</p>
+
+                {formData.paymentCards.map((card, index) => (
+                    <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                        <div className="flex justify-between items-start">
+                            <span className="text-sm font-medium text-gray-700">Tarjeta #{index + 1}</span>
+                            <button
+                                onClick={() => {
+                                    const newCards = formData.paymentCards.filter((_, i) => i !== index)
+                                    setFormData(prev => ({ ...prev, paymentCards: newCards }))
+                                }}
+                                className="text-red-600 hover:text-red-700"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <Input
+                            placeholder="Nombre del Banco"
+                            value={card.bank}
+                            onChange={(e) => {
+                                const newCards = [...formData.paymentCards]
+                                newCards[index].bank = e.target.value
+                                setFormData(prev => ({ ...prev, paymentCards: newCards }))
+                            }}
+                        />
+                        <Input
+                            placeholder="Número de Cuenta"
+                            value={card.accountNumber}
+                            onChange={(e) => {
+                                const newCards = [...formData.paymentCards]
+                                newCards[index].accountNumber = e.target.value
+                                setFormData(prev => ({ ...prev, paymentCards: newCards }))
+                            }}
+                        />
+                        <Input
+                            placeholder="Titular de la Cuenta"
+                            value={card.accountHolder}
+                            onChange={(e) => {
+                                const newCards = [...formData.paymentCards]
+                                newCards[index].accountHolder = e.target.value
+                                setFormData(prev => ({ ...prev, paymentCards: newCards }))
+                            }}
+                        />
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={card.cardType}
+                            onChange={(e) => {
+                                const newCards = [...formData.paymentCards]
+                                newCards[index].cardType = e.target.value
+                                setFormData(prev => ({ ...prev, paymentCards: newCards }))
+                            }}
+                        >
+                            <option value="">Tipo de Tarjeta</option>
+                            <option value="Débito">Débito</option>
+                            <option value="Crédito">Crédito</option>
+                            <option value="Transferencia">Transferencia</option>
+                        </select>
+                    </div>
+                ))}
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                        setFormData(prev => ({
+                            ...prev,
+                            paymentCards: [...prev.paymentCards, { bank: '', accountNumber: '', accountHolder: '', cardType: '' }]
+                        }))
+                    }}
+                >
+                    + Agregar Tarjeta
+                </Button>
+            </div>
+
+            {/* FAQs Section */}
+            <div className="space-y-4">
+                <h3 className="font-semibold text-gray-900">Preguntas Frecuentes</h3>
+                <p className="text-xs text-gray-500">Responde las dudas más comunes de tus clientes</p>
+
+                {formData.faqs.map((faq, index) => (
+                    <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                        <div className="flex justify-between items-start">
+                            <span className="text-sm font-medium text-gray-700">FAQ #{index + 1}</span>
+                            <button
+                                onClick={() => {
+                                    const newFaqs = formData.faqs.filter((_, i) => i !== index)
+                                    setFormData(prev => ({ ...prev, faqs: newFaqs }))
+                                }}
+                                className="text-red-600 hover:text-red-700"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <Input
+                            placeholder="Pregunta"
+                            value={faq.question}
+                            onChange={(e) => {
+                                const newFaqs = [...formData.faqs]
+                                newFaqs[index].question = e.target.value
+                                setFormData(prev => ({ ...prev, faqs: newFaqs }))
+                            }}
+                        />
+                        <Textarea
+                            placeholder="Respuesta"
+                            rows={3}
+                            value={faq.answer}
+                            onChange={(e) => {
+                                const newFaqs = [...formData.faqs]
+                                newFaqs[index].answer = e.target.value
+                                setFormData(prev => ({ ...prev, faqs: newFaqs }))
+                            }}
+                        />
+                    </div>
+                ))}
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                        setFormData(prev => ({
+                            ...prev,
+                            faqs: [...prev.faqs, { question: '', answer: '' }]
+                        }))
+                    }}
+                >
+                    + Agregar Pregunta
+                </Button>
+            </div>
+
+            <Button
+                className="w-full"
                 onClick={handleSave}
                 disabled={saving}
             >
@@ -442,7 +846,7 @@ function ReservationsContent() {
 
             const user = JSON.parse(currentUser)
             const response = await fetch(`/api/user/reservations?username=${user.username}`)
-            
+
             if (response.ok) {
                 const data = await response.json()
                 setReservations(data)
@@ -566,11 +970,10 @@ function ReservationsContent() {
     return (
         <div className="p-6 space-y-4">
             {message && (
-                <div className={`p-3 rounded-lg text-sm ${
-                    message.type === 'success' 
-                        ? 'bg-green-50 text-green-800 border border-green-200' 
-                        : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
                     {message.text}
                 </div>
             )}
@@ -602,25 +1005,25 @@ function ReservationsContent() {
                         <p className="text-sm text-gray-600 mb-1">{res.purchaserName}</p>
                         <p className="text-xs text-gray-500 mb-3">{res.purchaserPhone}</p>
                         <div className="flex gap-2">
-                            <Button 
-                                size="sm" 
+                            <Button
+                                size="sm"
                                 className="flex-1 bg-green-600 hover:bg-green-700"
                                 onClick={() => handleConfirm(res.id)}
                                 disabled={updating === res.id}
                             >
                                 Confirmar Pago
                             </Button>
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
+                            <Button
+                                size="sm"
+                                variant="outline"
                                 className="flex-shrink-0"
                                 onClick={() => sendWhatsApp(res)}
                             >
                                 <MessageCircle className="w-4 h-4" />
                             </Button>
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
+                            <Button
+                                size="sm"
+                                variant="outline"
                                 className="flex-1"
                                 onClick={() => handleCancel(res.id)}
                                 disabled={updating === res.id}
@@ -653,7 +1056,7 @@ function SalesContent() {
 
             const user = JSON.parse(currentUser)
             const response = await fetch(`/api/user/sales?username=${user.username}`)
-            
+
             if (response.ok) {
                 const data = await response.json()
                 setSales(data.sales)
@@ -674,7 +1077,7 @@ function SalesContent() {
 
             const user = JSON.parse(currentUser)
             const response = await fetch(`/api/user/sales/export?username=${user.username}`)
-            
+
             if (response.ok) {
                 const blob = await response.blob()
                 const url = window.URL.createObjectURL(blob)
@@ -718,9 +1121,9 @@ function SalesContent() {
 
             <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-gray-900">Ventas Recientes</h3>
-                <Button 
-                    size="sm" 
-                    variant="outline" 
+                <Button
+                    size="sm"
+                    variant="outline"
                     onClick={handleExport}
                     disabled={exporting}
                 >
@@ -788,7 +1191,7 @@ function RafflesContent() {
 
             const user = JSON.parse(currentUser)
             const response = await fetch(`/api/user/raffles?username=${user.username}`)
-            
+
             if (response.ok) {
                 const data = await response.json()
                 setRaffles(data)
@@ -912,11 +1315,10 @@ function RafflesContent() {
     return (
         <div className="p-6 space-y-4">
             {message && (
-                <div className={`p-3 rounded-lg text-sm ${
-                    message.type === 'success' 
-                        ? 'bg-green-50 text-green-800 border border-green-200' 
-                        : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
                     {message.text}
                 </div>
             )}
@@ -964,9 +1366,9 @@ function RafflesContent() {
                                 </div>
                             </div>
                             <div className="flex gap-2 mt-3">
-                                <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="flex-1 text-red-600 hover:bg-red-50"
                                     onClick={() => handleDelete(raffle.id)}
                                     disabled={raffle.soldTickets > 0}
@@ -984,7 +1386,7 @@ function RafflesContent() {
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg max-w-md w-full p-6 space-y-4">
                         <h3 className="text-lg font-bold">Crear Nueva Rifa</h3>
-                        
+
                         <div>
                             <label className="block text-sm font-medium mb-1">Título</label>
                             <Input
@@ -1078,7 +1480,7 @@ function UserContent() {
 
             const user = JSON.parse(currentUser)
             const response = await fetch(`/api/user/subscription?username=${user.username}`)
-            
+
             if (response.ok) {
                 const data = await response.json()
                 setSubscription(data.subscription)
@@ -1153,11 +1555,10 @@ function UserContent() {
     return (
         <div className="p-6 space-y-6">
             {message && (
-                <div className={`p-3 rounded-lg text-sm ${
-                    message.type === 'success' 
-                        ? 'bg-green-50 text-green-800 border border-green-200' 
-                        : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
+                <div className={`p-3 rounded-lg text-sm ${message.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
                     {message.text}
                 </div>
             )}
@@ -1172,12 +1573,12 @@ function UserContent() {
                         </div>
                         <Badge className={
                             subscription?.status === 'active' ? 'bg-green-100 text-green-800' :
-                            subscription?.status === 'expiring_soon' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
+                                subscription?.status === 'expiring_soon' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
                         }>
                             {subscription?.status === 'active' ? 'Activo' :
-                             subscription?.status === 'expiring_soon' ? 'Por vencer' :
-                             'Vencido'}
+                                subscription?.status === 'expiring_soon' ? 'Por vencer' :
+                                    'Vencido'}
                         </Badge>
                     </div>
                     <div className="text-xs text-gray-600 space-y-1">
@@ -1185,8 +1586,8 @@ function UserContent() {
                         <p>• {subscription?.planInfo?.tickets} boletos por rifa</p>
                         {subscription?.daysLeft !== null && (
                             <p className="font-medium">
-                                {subscription.daysLeft > 0 
-                                    ? `Vence en ${subscription.daysLeft} días` 
+                                {subscription.daysLeft > 0
+                                    ? `Vence en ${subscription.daysLeft} días`
                                     : `Vencido hace ${Math.abs(subscription.daysLeft)} días`}
                             </p>
                         )}
@@ -1199,8 +1600,8 @@ function UserContent() {
 
             <div className="space-y-4">
                 <h3 className="font-semibold text-gray-900">Seguridad</h3>
-                <Button 
-                    variant="outline" 
+                <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => setShowPasswordModal(true)}
                 >
@@ -1209,8 +1610,8 @@ function UserContent() {
             </div>
 
             <div className="pt-4 border-t">
-                <Button 
-                    variant="destructive" 
+                <Button
+                    variant="destructive"
                     className="w-full"
                     onClick={handleLogout}
                 >
@@ -1223,7 +1624,7 @@ function UserContent() {
                 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg max-w-md w-full p-6 space-y-4">
                         <h3 className="text-lg font-bold">Cambiar Contraseña</h3>
-                        
+
                         <div>
                             <label className="block text-sm font-medium mb-1">Contraseña Actual</label>
                             <Input

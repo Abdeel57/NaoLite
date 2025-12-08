@@ -30,6 +30,13 @@ model User {
   subscriptionEnd DateTime?
   lastPaymentDate DateTime?
   notes           String?
+
+  // Profile Customization
+  logoData        String?   // Base64 image data
+  bannerData      String?   // Base64 image data
+  primaryColor    String?   // Hex color code
+  paymentCards    String?   // JSON array: [{ bank, accountNumber, accountHolder, cardType }]
+  faqs            String?   // JSON array: [{ question, answer }]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
