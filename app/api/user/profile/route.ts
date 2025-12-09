@@ -74,16 +74,32 @@ export async function GET(request: NextRequest) {
 // PUT /api/user/profile
 export async function PUT(request: NextRequest) {
     const start = Date.now()
-    console.log('[Profile API] PUT request received')
+    console.log('[Profile API] ========== PUT REQUEST START ==========')
+    console.log('[Profile API] PUT request received at:', new Date().toISOString())
     try {
         const body = await request.json()
         console.log(`[Profile API] Body parsed. Size: ${JSON.stringify(body).length} bytes`)
+        console.log('[Profile API] Request body keys:', Object.keys(body))
+
         const {
             username, name, bio, email, phone,
             facebook, instagram, twitter, whatsapp,
             avatarUrl, logoData, bannerData, primaryColor,
             paymentCards, faqs
         } = body
+
+        console.log('[Profile API] Extracted fields:', {
+            username,
+            hasName: !!name,
+            hasBio: !!bio,
+            hasEmail: !!email,
+            hasPhone: !!phone,
+            hasPrimaryColor: !!primaryColor,
+            hasPaymentCards: !!paymentCards,
+            hasFaqs: !!faqs,
+            paymentCardsType: typeof paymentCards,
+            faqsType: typeof faqs
+        })
 
         // Validaciones
         if (!username) {
@@ -156,26 +172,32 @@ export async function PUT(request: NextRequest) {
 
         // Update user profile
         console.log(`[Profile API] Starting DB update for user: ${username}`)
+
+        const updateData = {
+            ...(name && { name }),
+            ...(bio !== undefined && { bio }),
+            ...(email && { email }),
+            ...(phone !== undefined && { phone }),
+            ...(facebook !== undefined && { facebook }),
+            ...(instagram !== undefined && { instagram }),
+            ...(twitter !== undefined && { twitter }),
+            ...(whatsapp !== undefined && { whatsapp }),
+            ...(avatarUrl !== undefined && { avatarUrl }),
+            ...(logoData !== undefined && { logoData }),
+            ...(bannerData !== undefined && { bannerData }),
+            ...(primaryColor !== undefined && { primaryColor }),
+            ...(paymentCards !== undefined && { paymentCards }),
+            ...(faqs !== undefined && { faqs }),
+        };
+
+        console.log('[Profile API] Update data fields:', Object.keys(updateData))
+        console.log('[Profile API] PaymentCards value:', paymentCards ? `${paymentCards.substring(0, 100)}...` : 'null')
+        console.log('[Profile API] FAQs value:', faqs ? `${faqs.substring(0, 100)}...` : 'null')
+
         const dbStart = Date.now()
         const updatedUser = await prisma.user.update({
             where: { username },
-            data: {
-                ...(name && { name }),
-                ...(bio !== undefined && { bio }),
-                ...(email && { email }),
-                ...(phone !== undefined && { phone }),
-                ...(facebook !== undefined && { facebook }),
-                ...(instagram !== undefined && { instagram }),
-                ...(twitter !== undefined && { twitter }),
-                ...(whatsapp !== undefined && { whatsapp }),
-                ...(whatsapp !== undefined && { whatsapp }),
-                ...(avatarUrl !== undefined && { avatarUrl }),
-                ...(logoData !== undefined && { logoData }),
-                ...(bannerData !== undefined && { bannerData }),
-                ...(primaryColor !== undefined && { primaryColor }),
-                ...(paymentCards !== undefined && { paymentCards }),
-                ...(faqs !== undefined && { faqs }),
-            },
+            data: updateData,
             select: {
                 id: true,
                 name: true,
@@ -200,11 +222,20 @@ export async function PUT(request: NextRequest) {
         })
         const dbDuration = Date.now() - dbStart
         console.log(`[Profile API] DB update took: ${dbDuration}ms`)
+        console.log('[Profile API] Update successful! Saved fields:', {
+            hasPaymentCards: !!updatedUser.paymentCards,
+            hasFaqs: !!updatedUser.faqs,
+            paymentCardsLength: updatedUser.paymentCards?.length || 0,
+            faqsLength: updatedUser.faqs?.length || 0
+        })
 
         const response = NextResponse.json({
             success: true,
             user: updatedUser
         })
+
+        console.log('[Profile API] ========== PUT REQUEST END (SUCCESS) ==========')
+        console.log(`[Profile API] Total duration: ${Date.now() - start}ms`)
 
         console.log(`[Profile API] PUT total duration: ${Date.now() - start}ms`)
         return response
