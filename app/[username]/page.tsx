@@ -14,10 +14,6 @@ import { AdminSlidePanel } from "../components/ui/admin-slide-panel"
 import { WelcomeTutorial } from "../components/tutorial/welcome-tutorial"
 import { useAuth } from "../components/auth/auth-context"
 
-// Force dynamic rendering - disable all caching
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 // Mock Data Fetcher
 function getOrganizer(username: string) {
     // Check if it's a demo user
