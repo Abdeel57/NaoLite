@@ -14,6 +14,10 @@ import { AdminSlidePanel } from "../components/ui/admin-slide-panel"
 import { WelcomeTutorial } from "../components/tutorial/welcome-tutorial"
 import { useAuth } from "../components/auth/auth-context"
 
+// Force dynamic rendering - disable all caching
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Mock Data Fetcher
 function getOrganizer(username: string) {
     // Check if it's a demo user
@@ -154,7 +158,15 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
                 const controller = new AbortController()
                 const id = setTimeout(() => controller.abort(), timeout)
                 try {
-                    const response = await fetch(url, { signal: controller.signal })
+                    const response = await fetch(url, {
+                        signal: controller.signal,
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    })
                     clearTimeout(id)
                     return response
                 } catch (error) {
@@ -163,8 +175,9 @@ export default function OrganizerProfilePage({ params }: { params: Promise<{ use
                 }
             }
 
-            // Cargar perfil del organizador
-            const profileResponse = await fetchWithTimeout(`/api/user/profile?username=${username}`)
+            // Cargar perfil del organizador con cache-busting
+            const cacheBuster = Date.now()
+            const profileResponse = await fetchWithTimeout(`/api/user/profile?username=${username}&_=${cacheBuster}`, 10000)
 
             if (!profileResponse.ok) {
                 console.log('Profile not found via API, checking fallback...')
