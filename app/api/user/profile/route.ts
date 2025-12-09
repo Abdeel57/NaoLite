@@ -32,9 +32,8 @@ export async function GET(request: NextRequest) {
                 twitter: true,
                 whatsapp: true,
                 plan: true,
-                // Images excluded for performance - use /api/user/profile/images instead
-                // logoData: true,
-                // bannerData: true,
+                logoData: true,
+                bannerData: true,
                 primaryColor: true,
                 paymentCards: true,
                 faqs: true,
