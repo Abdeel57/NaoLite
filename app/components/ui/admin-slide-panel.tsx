@@ -370,19 +370,24 @@ function CustomizeContent() {
                 })
 
                 // Actualizar localStorage con los nuevos datos
-                // Nota: La API ya no devuelve las imágenes para ahorrar ancho de banda,
-                // así que las tomamos del formData local.
                 const updatedUser = {
                     ...user,
                     ...data.user,
                     logoData: formData.logoData,
                     bannerData: formData.bannerData,
-                    primaryColor: formData.primaryColor
+                    primaryColor: formData.primaryColor,
+                    paymentCards: formData.paymentCards,
+                    faqs: formData.faqs
                 }
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser))
 
-                // Limpiar mensaje después de 3 segundos
-                setTimeout(() => setMessage(null), 3000)
+                // Mostrar mensaje de éxito
+                setMessage({ type: 'success', text: '✅ Cambios guardados. Recargando página...' })
+
+                // Recargar la página después de 1 segundo para mostrar los cambios
+                setTimeout(() => {
+                    window.location.reload()
+                }, 1000)
             } else {
                 setMessage({ type: 'error', text: data.error || 'Error al guardar' })
             }
