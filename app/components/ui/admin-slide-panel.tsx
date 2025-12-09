@@ -340,12 +340,29 @@ function CustomizeContent() {
             }
 
             console.log(`[Admin Panel] Payload size: ${(JSON.stringify(payload).length / 1024).toFixed(2)} KB`)
+            console.log('[Admin Panel] Payload preview:', {
+                username: payload.username,
+                hasName: !!payload.name,
+                hasBio: !!payload.bio,
+                hasPrimaryColor: !!payload.primaryColor,
+                hasPaymentCards: !!payload.paymentCards,
+                hasFaqs: !!payload.faqs,
+                hasLogoData: !!payload.logoData,
+                hasBannerData: !!payload.bannerData
+            })
 
+            console.log('[Admin Panel] Sending PUT request to /api/user/profile...')
             const response = await fetch('/api/user/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
                 signal: controller.signal
+            })
+
+            console.log('[Admin Panel] Response received:', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
             })
 
             const data = await response.json()
